@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import re
 from datetime import datetime
@@ -304,6 +305,10 @@ def write_report_node(state: AgentState) -> Dict[str, Any]:
     new_log = "✍️ Compiling final report..."
     logs.append(new_log)
     print(new_log)
+    
+    # If using Groq, pause for 10 seconds to allow the rolling TPM rate-limit window to decay
+    if os.getenv("LLM_PROVIDER", "groq").lower() == "groq":
+        time.sleep(10)
     
     llm = get_llm()
     
