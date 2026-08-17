@@ -80,6 +80,22 @@ if tavily_input.strip():
 elif env_tavily_key:
     os.environ["TAVILY_API_KEY"] = env_tavily_key
 
+# LLM Model Selection
+st.sidebar.subheader("🤖 LLM Model Selection")
+model_selection = st.sidebar.selectbox(
+    "Choose Groq Model",
+    options=[
+        "llama-3.3-70b-versatile",
+        "llama-3.1-70b-versatile",
+        "llama3-70b-8192",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768"
+    ],
+    index=0,
+    help="Select the LLM model to power the agent. Switch if your account doesn't have access to Llama 3.3."
+)
+os.environ["GROQ_MODEL"] = model_selection
+
 # Check Status
 if os.getenv("GROQ_API_KEY"):
     st.sidebar.success("🟢 Groq API Key Active")

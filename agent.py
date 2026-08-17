@@ -24,10 +24,13 @@ def get_llm():
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY is not set. Please set it in your .env file or Streamlit secrets.")
-    # Use Llama 3.3 70b for high-quality reasoning and synthesis
+    
+    # Read the model dynamically from environment variable set by Streamlit UI
+    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    
     return ChatGroq(
         groq_api_key=api_key,
-        model_name="llama-3.3-70b-versatile",
+        model_name=model_name,
         temperature=0.2,
         max_tokens=4096
     )
