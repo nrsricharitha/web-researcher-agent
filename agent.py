@@ -27,7 +27,7 @@ def get_llm():
     # Use Llama 3.3 70b for high-quality reasoning and synthesis
     return ChatGroq(
         groq_api_key=api_key,
-        model_name="llama-3.3-70b-specdec",
+        model_name="llama-3.3-70b-versatile",
         temperature=0.2,
         max_tokens=4096
     )
