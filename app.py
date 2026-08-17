@@ -42,6 +42,39 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def get_available_groq_models(api_key: str) -> list:
+    """
+    Fetches the list of active models directly from the Groq API.
+    """
+    default_models = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768"
+    ]
+    if not api_key:
+        return default_models
+    try:
+        import requests
+        url = "https://api.groq.com/openai/v1/models"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            models = []
+            for model in data.get("data", []):
+                model_id = model.get("id")
+                # Filter for text chat models (exclude audio/whisper/guard models)
+                lower_id = model_id.lower()
+                if any(x in lower_id for x in ["llama", "mixtral", "gemma"]) and not any(y in lower_id for y in ["whisper", "guard"]):
+                    models.append(model_id)
+            models.sort()
+            if models:
+                return models
+    except Exception:
+        pass
+    return default_models
+
 # ----------------- SIDEBAR -----------------
 st.sidebar.title("⚙️ Configurations")
 
@@ -80,19 +113,17 @@ if tavily_input.strip():
 elif env_tavily_key:
     os.environ["TAVILY_API_KEY"] = env_tavily_key
 
+# Fetch available models based on active key
+active_groq_key = os.environ.get("GROQ_API_KEY")
+available_models = get_available_groq_models(active_groq_key)
+
 # LLM Model Selection
 st.sidebar.subheader("🤖 LLM Model Selection")
 model_selection = st.sidebar.selectbox(
     "Choose Groq Model",
-    options=[
-        "llama-3.3-70b-versatile",
-        "llama-3.1-70b-versatile",
-        "llama3-70b-8192",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768"
-    ],
-    index=0,
-    help="Select the LLM model to power the agent. Switch if your account doesn't have access to Llama 3.3."
+    options=available_models,
+    index=0 if "llama-3.3-70b-versatile" in available_models else (available_models.index("llama-3.1-70b-versatile") if "llama-3.1-70b-versatile" in available_models else 0),
+    help="Select the LLM model to power the agent. This list is loaded dynamically from your active Groq account."
 )
 os.environ["GROQ_MODEL"] = model_selection
 
