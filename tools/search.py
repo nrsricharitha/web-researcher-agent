@@ -10,20 +10,28 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     tavily_key = os.getenv("TAVILY_API_KEY")
     if tavily_key:
         try:
-            from langchain_community.utilities import TavilySearchAPIWrapper
-            search = TavilySearchAPIWrapper(tavily_api_key=tavily_key)
-            results = search.raw_results(query, max_results=max_results)
-            formatted = []
-            for r in results.get("results", []):
-                formatted.append({
-                    "title": r.get("title", ""),
-                    "url": r.get("url", ""),
-                    "snippet": r.get("content", "")
-                })
-            return formatted
-        except Exception:
-            # Fallback to DuckDuckGo if Tavily fails
-            pass
+            import requests
+            url = "https://api.tavily.com/search"
+            payload = {
+                "api_key": tavily_key,
+                "query": query,
+                "max_results": max_results
+            }
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                results = response.json()
+                formatted = []
+                for r in results.get("results", []):
+                    formatted.append({
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "snippet": r.get("content", "")
+                    })
+                return formatted
+            else:
+                print(f"Tavily API error: Status {response.status_code}")
+        except Exception as e:
+            print(f"Tavily API request failed: {e}")
             
     # Free DuckDuckGo fallback
     try:
