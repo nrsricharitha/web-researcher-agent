@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 # Import LangGraph components
 from langgraph.graph import StateGraph, END
 
-# Import LangChain Groq model
+# Import LangChain models
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 # Import our custom types and tools
@@ -19,29 +20,54 @@ from tools import web_search, scrape_webpage
 # Load environment variables
 load_dotenv()
 
-# Initialize LLM (Groq)
+# Initialize LLM dynamically based on user provider selection
 def get_llm():
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise ValueError("GROQ_API_KEY is not set. Please set it in your .env file or Streamlit secrets.")
+    provider = os.getenv("LLM_PROVIDER", "groq").lower()
     
-    # Read the model dynamically from environment variable set by Streamlit UI
-    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-    
-    return ChatGroq(
-        groq_api_key=api_key,
-        model_name=model_name,
-        temperature=0.2,
-        max_tokens=4096
-    )
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is not set. Please configure it in your .env file or Streamlit sidebar.")
+        model_name = os.getenv("LLM_MODEL", "gpt-4o-mini")
+        return ChatOpenAI(
+            api_key=api_key,
+            model=model_name,
+            temperature=0.2
+        )
+        
+    elif provider == "nvidia":
+        api_key = os.getenv("NVIDIA_API_KEY")
+        if not api_key:
+            raise ValueError("NVIDIA_API_KEY is not set. Please configure it in your .env file or Streamlit sidebar.")
+        model_name = os.getenv("LLM_MODEL", "meta/llama-3.1-8b-instruct")
+        return ChatOpenAI(
+            api_key=api_key,
+            base_url="https://integrate.api.nvidia.com/v1",
+            model=model_name,
+            temperature=0.2
+        )
+        
+    else:  # Default to Groq
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY is not set. Please configure it in your .env file or Streamlit sidebar.")
+        model_name = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
+        return ChatGroq(
+            groq_api_key=api_key,
+            model_name=model_name,
+            temperature=0.2,
+            max_tokens=4096
+        )
 
 def clean_json_response(content: str) -> Dict[str, Any]:
     """
-    Cleans markdown code blocks (like ```json ... ```) from LLM response
-    and parses it into a Python dictionary.
+    Cleans reasoning thoughts (<think>...</think>) and markdown code blocks
+    (like ```json ... ```) from LLM response and parses it into a dictionary.
     """
-    cleaned = content.strip()
-    # Remove markdown code blocks if present
+    # 1. Strip reasoning thoughts if present (common in Qwen/DeepSeek thinking models)
+    cleaned = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    
+    # 2. Remove markdown code blocks if present
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?\n", "", cleaned)
         cleaned = re.sub(r"\n```$", "", cleaned)
@@ -160,8 +186,8 @@ def scrape_pages_node(state: AgentState) -> Dict[str, Any]:
     # Identify which URLs we haven't scraped yet
     urls_to_scrape = [url for url in urls if url not in scraped_data]
     
-    # Limit scraping to top 4 pages per loop to prevent context bloat
-    urls_to_scrape = urls_to_scrape[:4]
+    # Limit scraping to top 2 pages per loop to prevent context bloat
+    urls_to_scrape = urls_to_scrape[:2]
     
     if not urls_to_scrape:
         no_scrape_log = "💡 No new URLs to scrape in this loop."
@@ -281,10 +307,11 @@ def write_report_node(state: AgentState) -> Dict[str, Any]:
     
     llm = get_llm()
     
-    # Format all scraped content for LLM synthesis
+    # Format all scraped content for LLM synthesis (trimmed to 3500 chars to fit Groq free tier rate limits)
     full_contexts = ""
     for url, text in scraped_data.items():
-        full_contexts += f"--- SOURCE: {url} ---\n{text}\n\n"
+        trimmed_text = text[:2000] if text else "No content scraped."
+        full_contexts += f"--- SOURCE: {url} ---\n{trimmed_text}\n\n"
         
     system_prompt = (
         "You are an expert technical writer and researcher. Your task is to write a comprehensive, "

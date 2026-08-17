@@ -27,9 +27,11 @@ st.markdown("""
         border-radius: 10px;
         border: 1px solid #30363d;
         margin-top: 20px;
+        color: #e6edf3;
     }
     .log-box {
         background-color: #161b22;
+        color: #e6edf3;
         padding: 15px;
         border-radius: 5px;
         border-left: 4px solid #4f46e5;
@@ -47,22 +49,69 @@ st.markdown("""
 # ----------------- SIDEBAR -----------------
 st.sidebar.title("⚙️ Configurations")
 
+# LLM Provider Selection
+st.sidebar.subheader("🤖 LLM Provider Selection")
+provider = st.sidebar.selectbox(
+    "Choose LLM Provider",
+    options=["Groq", "OpenAI", "NVIDIA NIM"],
+    index=0
+)
+provider_lower = provider.lower()
+if provider_lower == "nvidia nim":
+    provider_lower = "nvidia"
+os.environ["LLM_PROVIDER"] = provider_lower
+
 # API Keys Configuration
 st.sidebar.subheader("🔑 API Keys")
-env_groq_key = os.getenv("GROQ_API_KEY")
 env_tavily_key = os.getenv("TAVILY_API_KEY")
-
-groq_placeholder = "Key configured via .env 🔒" if env_groq_key else "gsk_..."
 tavily_placeholder = "Key configured via .env 🔒" if env_tavily_key else "tvly_..."
 
-# Inputs
-groq_input = st.sidebar.text_input(
-    "Groq API Key",
-    value="",
-    placeholder=groq_placeholder,
-    type="password",
-    help="If left blank, uses the key from your .env file."
-)
+# Show API Key based on provider
+if provider_lower == "groq":
+    env_groq_key = os.getenv("GROQ_API_KEY")
+    groq_placeholder = "Key configured via .env 🔒" if env_groq_key else "gsk_..."
+    groq_input = st.sidebar.text_input(
+        "Groq API Key",
+        value="",
+        placeholder=groq_placeholder,
+        type="password",
+        help="If left blank, uses the key from your .env file."
+    )
+    if groq_input.strip():
+        os.environ["GROQ_API_KEY"] = groq_input.strip()
+    elif env_groq_key:
+        os.environ["GROQ_API_KEY"] = env_groq_key
+
+elif provider_lower == "openai":
+    env_openai_key = os.getenv("OPENAI_API_KEY")
+    openai_placeholder = "Key configured via .env 🔒" if env_openai_key else "sk-..."
+    openai_input = st.sidebar.text_input(
+        "OpenAI API Key",
+        value="",
+        placeholder=openai_placeholder,
+        type="password",
+        help="If left blank, uses the key from your .env file."
+    )
+    if openai_input.strip():
+        os.environ["OPENAI_API_KEY"] = openai_input.strip()
+    elif env_openai_key:
+        os.environ["OPENAI_API_KEY"] = env_openai_key
+
+elif provider_lower == "nvidia":
+    env_nvidia_key = os.getenv("NVIDIA_API_KEY")
+    nvidia_placeholder = "Key configured via .env 🔒" if env_nvidia_key else "nvapi-..."
+    nvidia_input = st.sidebar.text_input(
+        "NVIDIA API Key",
+        value="",
+        placeholder=nvidia_placeholder,
+        type="password",
+        help="If left blank, uses the key from your .env file."
+    )
+    if nvidia_input.strip():
+        os.environ["NVIDIA_API_KEY"] = nvidia_input.strip()
+    elif env_nvidia_key:
+        os.environ["NVIDIA_API_KEY"] = env_nvidia_key
+
 tavily_input = st.sidebar.text_input(
     "Tavily API Key (Optional)",
     value="",
@@ -70,38 +119,59 @@ tavily_input = st.sidebar.text_input(
     type="password",
     help="Optional. If left blank, agent will use free DuckDuckGo search."
 )
-
-# Apply overrides dynamically
-if groq_input.strip():
-    os.environ["GROQ_API_KEY"] = groq_input.strip()
-elif env_groq_key:
-    os.environ["GROQ_API_KEY"] = env_groq_key
-
 if tavily_input.strip():
     os.environ["TAVILY_API_KEY"] = tavily_input.strip()
 elif env_tavily_key:
     os.environ["TAVILY_API_KEY"] = env_tavily_key
 
 # LLM Model Selection
-st.sidebar.subheader("🤖 LLM Model Selection")
-model_selection = st.sidebar.selectbox(
-    "Choose Groq Model",
-    options=[
+st.sidebar.subheader("📦 Model Selection")
+if provider_lower == "groq":
+    models = [
+        "qwen/qwen3.6-27b",
         "llama-3.1-8b-instant",
         "llama-3.3-70b-versatile",
-        "llama-3.1-70b-versatile",
         "gemma2-9b-it"
-    ],
+    ]
+elif provider_lower == "openai":
+    models = [
+        "gpt-4o-mini",
+        "gpt-4o",
+        "gpt-3.5-turbo"
+    ]
+else:  # nvidia nim
+    models = [
+        "meta/llama-3.2-3b-instruct",
+        "meta/llama-3.3-70b-instruct",
+        "meta/llama-3.1-8b-instruct",
+        "meta/llama-3.1-405b-instruct"
+    ]
+
+model_selection = st.sidebar.selectbox(
+    "Choose Model",
+    options=models,
     index=0,
-    help="Select the LLM model to power the agent. Switch to Llama 3.1 8B if you are on the free tier."
+    help="Select the LLM model to power the agent."
 )
-os.environ["GROQ_MODEL"] = model_selection
+os.environ["LLM_MODEL"] = model_selection
 
 # Check Status
-if os.getenv("GROQ_API_KEY"):
-    st.sidebar.success("🟢 Groq API Key Active")
-else:
-    st.sidebar.warning("🔴 Groq API Key Missing")
+st.sidebar.subheader("🚦 Provider Status")
+if provider_lower == "groq":
+    if os.getenv("GROQ_API_KEY"):
+        st.sidebar.success("🟢 Groq API Key Active")
+    else:
+        st.sidebar.warning("🔴 Groq API Key Missing")
+elif provider_lower == "openai":
+    if os.getenv("OPENAI_API_KEY"):
+        st.sidebar.success("🟢 OpenAI API Key Active")
+    else:
+        st.sidebar.warning("🔴 OpenAI API Key Missing")
+elif provider_lower == "nvidia":
+    if os.getenv("NVIDIA_API_KEY"):
+        st.sidebar.success("🟢 NVIDIA API Key Active")
+    else:
+        st.sidebar.warning("🔴 NVIDIA API Key Missing")
 
 if os.getenv("TAVILY_API_KEY"):
     st.sidebar.info("🟢 Tavily Search Active")
@@ -124,12 +194,22 @@ user_query = st.text_area(
 
 # Run button
 if st.button("🚀 Start Autonomous Research", use_container_width=True):
-    if not os.getenv("GROQ_API_KEY"):
+    missing_key = False
+    if provider_lower == "groq" and not os.getenv("GROQ_API_KEY"):
         st.error("Please provide a Groq API Key in the sidebar or in a .env file to run the agent.")
-    elif not user_query.strip():
-        st.warning("Please enter a research topic to start.")
-    else:
-        st.subheader("🤖 Agent Execution Logs")
+        missing_key = True
+    elif provider_lower == "openai" and not os.getenv("OPENAI_API_KEY"):
+        st.error("Please provide an OpenAI API Key in the sidebar or in a .env file to run the agent.")
+        missing_key = True
+    elif provider_lower == "nvidia" and not os.getenv("NVIDIA_API_KEY"):
+        st.error("Please provide an NVIDIA API Key in the sidebar or in a .env file to run the agent.")
+        missing_key = True
+
+    if not missing_key:
+        if not user_query.strip():
+            st.warning("Please enter a research topic to start.")
+        else:
+            st.subheader("🤖 Agent Execution Logs")
         
         # Placeholders for UI updating
         log_placeholder = st.empty()
